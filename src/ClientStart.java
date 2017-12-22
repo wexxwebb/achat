@@ -1,9 +1,9 @@
 import client.Client;
+import client.ConnectionData;
 import client.ReaderClient;
 import client.WriterClient;
 
 import java.io.IOException;
-import java.net.Socket;
 import java.util.Scanner;
 
 public class ClientStart {
@@ -12,56 +12,67 @@ public class ClientStart {
     static private String address = "127.0.0.1";
 
     public static void main(String[] args) {
-        Socket socket = null;
-        Scanner console = new Scanner(System.in);
-        boolean success = false;
-        while (!success) {
+        Scanner scanner = new Scanner(System.in);
+        ConnectionData connectionData = new ConnectionData(address, port);
+        int retry = 0;
+        connection:
+        while (true) {
             try {
-                socket = new Socket(address, port);
-                success = true;
+                System.out.printf("Connection to '%s:%d...", connectionData.getAddress(), connectionData.getPort());
+                connectionData.connect();
+                System.out.println("Success!");
+                Client reader = new ReaderClient(connectionData);
+                Client writer = new WriterClient(connectionData);
+                Thread readerThread = new Thread(reader);
+                Thread writerThread = new Thread(writer);
+                readerThread.start();
+                writerThread.start();
+                break;
             } catch (IOException e) {
-                System.out.println("Can't connect to server " + address + ":" + port);
-                System.out.println("Press 'Enter' to retry");
-                System.out.println("Type 'address:port' (example: 127.0.0.1:5555");
-                System.out.println("Type 'exit' to return");
-                String com = console.nextLine();
-                if (com.equals("exit")) {
-                    return;
-                } else if (com.isEmpty()) {
-                    success = false;
+                retry++;
+                if (retry < 3) {
+                    System.out.printf("Can't create socket '%s:%d'. Retry %d\n",
+                            connectionData.getAddress(), connectionData.getPort(), retry);
+                    continue;
                 } else {
-                    String[] comAr = com.split(":");
-                    address = comAr[0];
-                    try {
-                        port = Integer.parseInt(comAr[1]);
-                    } catch (NumberFormatException e1) {
-                        System.out.println("Can't read port. Type number.");
+                    System.out.printf("Can't create socket '%s:%d'. Sysytem message: '%s'\n",
+                            connectionData.getAddress(), connectionData.getPort(), e.getMessage());
+                    System.out.println("Press enter to retry, type 'address:port' to change, type 'exit' to exit");
+                    parseInt:
+                    while (true) {
+                        String com = scanner.nextLine();
+                        if (com.isEmpty()) {
+                            retry = 0;
+                            continue connection;
+                        } else if ("exit".equals(com)) {
+                            return;
+                        } else {
+                            String[] s = com.split(":");
+                            if (s[1].matches("[0-9]+")) {
+                                connectionData.setAddress(s[0]);
+                                connectionData.setPort(Integer.parseInt(s[1]));
+                                retry = 0;
+                                break parseInt;
+                            } else {
+                                System.out.println("Port should be numeric!");
+                            }
+                        }
                     }
                 }
             }
         }
-        Client writerClient = null;
-        Client readerClient = null;
-        success = false;
-        int tryCount = 0;
-        while (!success) {
-            try {
-                writerClient = new WriterClient(socket);
-                readerClient = new ReaderClient(socket);
-                success = true;
-            } catch (IOException e) {
-                tryCount++;
-                if (tryCount < 6) {
-                    System.out.println("Can't read or write socket. Try " + tryCount);
-                } else {
-                    System.out.println("Socket error");
-                    return;
-                }
-            }
-        }
-        Thread readerClientThread = new Thread(readerClient);
-        Thread writerClientThread = new Thread(writerClient);
-        readerClientThread.start();
-        writerClientThread.start();
+        Thread exit = new Thread(
+                () -> {
+                    synchronized (connectionData) {
+                        try {
+                            connectionData.wait();
+                            System.exit(1);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                            return;
+                        }
+                    }
+                });
+        exit.start();
     }
 }

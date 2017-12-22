@@ -1,44 +1,60 @@
 package client;
 
 import java.io.*;
-import java.net.Socket;
 import java.util.Scanner;
+
+import static common.SystemMessages.*;
 
 public class WriterClient implements Client {
 
-    private Socket socket;
-    private String nickName;
-    private BufferedWriter bWriter;
+    private ConnectionData connectionData;
     private Scanner console;
 
-    public WriterClient(Socket socket) throws IOException {
-        this.socket = socket;
-        bWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+    public WriterClient(ConnectionData connectionData) {
+        this.connectionData = connectionData;
         console = new Scanner(System.in);
     }
 
-    @Override
-    public void run() {
-        int tryCount = 0;
+    private boolean send(String message) {
+        int retry = 0;
         while (true) {
-            String message = console.nextLine();
-            boolean success = false;
-            while (!success) {
-                try {
-                    bWriter.write(message);
-                    bWriter.newLine();
-                    bWriter.flush();
-                    success = true;
-                } catch (IOException e) {
-                    tryCount++;
-                    if (tryCount < 6) {
-                        System.out.println("Problem with send message. Retry " + tryCount);
-                    } else {
-                        System.out.println("Send maessage error");
-                        return;
-                    }
+            try {
+                connectionData.getbWriter().write(message);
+                connectionData.getbWriter().newLine();
+                connectionData.getbWriter().flush();
+                return true;
+            } catch (IOException e) {
+                retry++;
+                if (retry > 3) {
+                    System.out.println("Can't send message");
+                    connectionData.exit();
+                    return false;
+                } else {
+                    System.out.println("Problem with send message. Retry " + retry);
+                    connectionData.sleep(200);
                 }
             }
         }
     }
+
+    @Override
+    public void run() {
+        String message;
+        while (connectionData.getPlay()) {
+            message = console.nextLine();
+            switch (connectionData.getState()) {
+                case NOT_AUTHORIZED:
+                    String login = message;
+                    System.out.println("Input password:");
+                    String password = console.nextLine();
+                    password = Integer.toString(Integer.toString(password.hashCode() + SALT.hashCode()).hashCode());
+                    message = LOGIN_AND_HASH_CODE_PASSWORD + login + "\u0005" + password;
+            }
+
+            if (!send(message)) {
+                return;
+            }
+        }
+    }
+
 }
