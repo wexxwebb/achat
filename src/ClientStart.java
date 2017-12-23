@@ -1,5 +1,5 @@
 import client.Client;
-import client.ConnectionData;
+import client.ClientData;
 import client.ReaderClient;
 import client.WriterClient;
 
@@ -13,16 +13,16 @@ public class ClientStart {
 
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        ConnectionData connectionData = new ConnectionData(address, port);
+        ClientData clientData = new ClientData(address, port);
         int retry = 0;
         connection:
         while (true) {
             try {
-                System.out.printf("Connection to '%s:%d...", connectionData.getAddress(), connectionData.getPort());
-                connectionData.connect();
+                System.out.printf("Connection to '%s:%d...", clientData.getAddress(), clientData.getPort());
+                clientData.connect();
                 System.out.println("Success!");
-                Client reader = new ReaderClient(connectionData);
-                Client writer = new WriterClient(connectionData);
+                Client reader = new ReaderClient(clientData);
+                Client writer = new WriterClient(clientData);
                 Thread readerThread = new Thread(reader);
                 Thread writerThread = new Thread(writer);
                 readerThread.start();
@@ -32,11 +32,11 @@ public class ClientStart {
                 retry++;
                 if (retry < 3) {
                     System.out.printf("Can't create socket '%s:%d'. Retry %d\n",
-                            connectionData.getAddress(), connectionData.getPort(), retry);
+                            clientData.getAddress(), clientData.getPort(), retry);
                     continue;
                 } else {
                     System.out.printf("Can't create socket '%s:%d'. Sysytem message: '%s'\n",
-                            connectionData.getAddress(), connectionData.getPort(), e.getMessage());
+                            clientData.getAddress(), clientData.getPort(), e.getMessage());
                     System.out.println("Press enter to retry, type 'address:port' to change, type 'exit' to exit");
                     parseInt:
                     while (true) {
@@ -49,8 +49,8 @@ public class ClientStart {
                         } else {
                             String[] s = com.split(":");
                             if (s[1].matches("[0-9]+")) {
-                                connectionData.setAddress(s[0]);
-                                connectionData.setPort(Integer.parseInt(s[1]));
+                                clientData.setAddress(s[0]);
+                                clientData.setPort(Integer.parseInt(s[1]));
                                 retry = 0;
                                 break parseInt;
                             } else {
@@ -63,9 +63,9 @@ public class ClientStart {
         }
         Thread exit = new Thread(
                 () -> {
-                    synchronized (connectionData) {
+                    synchronized (clientData) {
                         try {
-                            connectionData.wait();
+                            clientData.wait();
                             System.exit(1);
                         } catch (InterruptedException e) {
                             e.printStackTrace();

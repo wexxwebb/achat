@@ -1,25 +1,29 @@
 package client;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
 import java.io.*;
 import java.net.Socket;
 
 import static common.SystemMessages.*;
 
-public class ConnectionData {
+public class ClientData {
 
     private String address;
     private int port;
     private String name;
     private String passwordHash;
-    private Client reader;
-    private Client writer;
     private Socket socket;
     private BufferedReader bReader;
     private BufferedWriter bWriter;
     private volatile boolean play = true;
-    private String state;
+    private volatile int state;
+    private GsonBuilder gsonBuilder = new GsonBuilder();
+    private Gson gson = gsonBuilder.create();
 
-    public ConnectionData(String address, int port) {
+
+    public ClientData(String address, int port) {
         this.address = address;
         this.port = port;
     }
@@ -36,7 +40,11 @@ public class ConnectionData {
         this.socket = new Socket(address, port);
         this.bReader = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
         this.bWriter = new BufferedWriter(new OutputStreamWriter(this.socket.getOutputStream()));
-        this.state = CONNECTED;
+        if (state == STATE_AUTH_OK || state == STATE_REGISTER_OK) {
+            this.state = STATE_CONNECTED_AGAIN;
+        } else {
+            this.state = STATE_CONNECTED;
+        }
     }
 
     public void exit() {
@@ -63,6 +71,10 @@ public class ConnectionData {
         }
     }
 
+    public Gson getGson() {
+        return gson;
+    }
+
     public String getPasswordHash() {
         return passwordHash;
     }
@@ -71,11 +83,11 @@ public class ConnectionData {
         this.passwordHash = passwordHash;
     }
 
-    public String getState() {
+    public int getState() {
         return state;
     }
 
-    public void setState(String state) {
+    public void setState(int state) {
         this.state = state;
     }
 
@@ -93,10 +105,6 @@ public class ConnectionData {
 
     public BufferedWriter getbWriter() {
         return bWriter;
-    }
-
-    public void setbWriter(BufferedWriter bWriter) {
-        this.bWriter = bWriter;
     }
 
     public String getAddress() {
@@ -123,27 +131,4 @@ public class ConnectionData {
         this.port = port;
     }
 
-    public Client getReader() {
-        return reader;
-    }
-
-    public void setReader(Client reader) {
-        this.reader = reader;
-    }
-
-    public Client getWriter() {
-        return writer;
-    }
-
-    public void setWriter(Client writer) {
-        this.writer = writer;
-    }
-
-    public Socket getSocket() {
-        return socket;
-    }
-
-    public void setSocket(Socket socket) {
-        this.socket = socket;
-    }
 }

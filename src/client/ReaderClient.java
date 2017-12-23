@@ -1,100 +1,130 @@
 package client;
 
+import common.Message;
 import java.io.IOException;
-
 import static common.SystemMessages.*;
 
 public class ReaderClient implements Client {
 
-    private ConnectionData connectionData;
+    private ClientData clientData;
 
-    public ReaderClient(ConnectionData connectionData) {
-        this.connectionData = connectionData;
+    public ReaderClient(ClientData clientData) {
+        this.clientData = clientData;
     }
 
-    private String readMessage() {
-        String message;
+    private String readString() {
+        String string;
         int retry = 0;
         while (true) {
             try {
-                while (connectionData.getPlay() && (message = connectionData.getbReader().readLine()) != null) {
-                    return message;
+                while ((string = clientData.getbReader().readLine()) != null) {
+                    return string;
                 }
             } catch (IOException e) {
                 retry++;
                 if (retry > 3) {
-                    return READING_ERROR;
+                    if (reConnect()) {
+                        string = clientData.getGson().toJson(new Message(USER, "Connection restored"));
+                        if (clientData.getState() == STATE_NOT_AUTHORIZED) {
+                            System.out.println("Input login:");
+                        }
+                        return string;
+                    } else {
+                        return READING_ERROR;
+                    }
                 } else {
                     System.out.println("Message reading error. Retry " + retry);
-                    connectionData.sleep(200);
+                    clientData.sleep(200);
                 }
             }
         }
     }
 
-    private boolean checkPrint(String message) {
-        switch (message) {
-            case READING_ERROR:
-                int retry = 0;
-                while (true) {
-                    try {
-                        System.out.printf("Connection to '%s:%d'...",
-                                connectionData.getAddress(), connectionData.getPort());
-                        connectionData.connect();
-                        System.out.println("Success!");
-                        return true;
-                    } catch (IOException e) {
-                        retry++;
-                        if (retry > 3) {
-                            System.out.println("Exit with connection error");
-                            connectionData.exit();
-                            return false;
-                        } else {
-                            System.out.println("Can't create socket. Retry " + retry);
-                        }
-                    }
-                }
-            case LOGINANDPASSWORD_REQUEST:
-                System.out.println("Input login:");
-                connectionData.setState(NOT_AUTHORIZED);
+    private boolean reConnect() {
+        int retry = 0;
+        while (true) {
+            try {
+                clientData.connect();
                 return true;
+            } catch (IOException e) {
+                retry++;
+                if (retry > 3) {
+                    return false;
+                } else {
+                    System.out.printf("Connection to '%s:%d'. Retry %d\n", clientData.getAddress(), clientData.getPort(), retry);
+                    clientData.sleep(1000);
+                }
+            }
+        }
+    }
+
+    private void auth_ok(Message message, String showInConsole) {
+        clientData.setPlay(true);
+        clientData.setState(STATE_AUTH_OK);
+        clientData.setName(message.getLogin());
+        clientData.setPasswordHash(message.getPasswordHash());
+        System.out.println(showInConsole);
+        System.out.println("Hi, " + clientData.getName());
+    }
+
+    private void handleSysMessages(Message message) {
+        switch (message.getMessage()) {
+            case LOGINANDPASSWORD_REQUEST:
+                switch (clientData.getState()) {
+
+                    case STATE_CONNECTED:
+                        System.out.println("Input login:");
+                        clientData.setState(STATE_NOT_AUTHORIZED);
+                        break;
+
+                    case STATE_CONNECTED_AGAIN:
+                        clientData.setState(STATE_SEND_LOGIN_PASSWORD);
+                        break;
+                }
+                break;
+
+            case AUTH_ACCEPT_OK:
+                auth_ok(message, "Authentication... OK.");
+                break;
+
+            case REGISTER_ACCEPT_OK:
+                auth_ok(message, "Registration... OK.");
+                break;
+
             case INCORRECT_PASSWORD:
                 System.out.println("Authentication... FAIL! Incorrect password");
-                System.out.println("Input login:");
-                connectionData.setState(NOT_AUTHORIZED);
-                return true;
-            default:
-                if (message.startsWith(AUTH_OK)) {
-                    connectionData.setState(AUTH_OK);
-                    String[] auths = message.split("\\u0005");
-                    connectionData.setName(auths[auths.length - 2]);
-                    connectionData.setPasswordHash(auths[auths.length - 1]);
-                    System.out.println("Authetication... OK.");
-                    System.out.println("Hi, " + connectionData.getName());
-                    return true;
-                }
-                if (message.startsWith(REGISTER_OK)) {
-                    connectionData.setState(AUTH_OK);
-                    String[] auths = message.split("\\u0005");
-                    connectionData.setName(auths[auths.length - 2]);
-                    connectionData.setPasswordHash(auths[auths.length - 1]);
-                    System.out.println("Register... OK.");
-                    System.out.println("Hi, " + connectionData.getName());
-                    return true;
-                }
-                System.out.println(message);
-                return true;
+                clientData.setState(STATE_NOT_AUTHORIZED);
+                break;
+        }
+    }
+
+    private void parseString() {
+        String string = readString();
+        if (READING_ERROR.equals(string)) {
+            clientData.exit();
+            return;
+        }
+        Message message = clientData.getGson().fromJson(string, Message.class);
+        switch (message.getType()) {
+            case SYSTEM:
+                handleSysMessages(message);
+                break;
+
+            case USER:
+                System.out.println(message.getMessage());
+                break;
         }
     }
 
     @Override
+    public void sendLoginPassword() {
+
+    }
+
+    @Override
     public void run() {
-        String message;
-        while (connectionData.getPlay()) {
-            message = readMessage();
-            if (!checkPrint(message)) {
-                return;
-            }
+        while (clientData.getPlay()) {
+            parseString();
         }
     }
 }

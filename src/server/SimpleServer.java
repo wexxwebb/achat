@@ -1,5 +1,9 @@
 package server;
 
+import common.Message;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
 import java.io.*;
 import java.net.Socket;
 import java.util.Map;
@@ -15,14 +19,17 @@ public class SimpleServer implements Server {
     private BufferedWriter bWriter;
     private String userName = "Unknown";
     private String passwordHash;
-    private final Map<String, String> users;
-    private boolean play = true;
     private boolean auth = false;
+    private final Map<String, String> users;
+    private GsonBuilder gsonBuilder;
+    private Gson gson;
 
     public SimpleServer(Socket socket, BlockingQueue<Server> serverPool, Map<String, String> users) {
         this.socket = socket;
         this.serverPool = serverPool;
         this.users = users;
+        this.gsonBuilder = new GsonBuilder();
+        this.gson = gsonBuilder.create();
         int retry = 0;
         while (true) {
             try {
@@ -41,11 +48,16 @@ public class SimpleServer implements Server {
     }
 
     @Override
-    public boolean sendMessage(String message) {
+    public boolean isAuth() {
+        return auth;
+    }
+
+    @Override
+    public boolean sendString(String string) {
         int retry = 0;
         while (true) {
             try {
-                bWriter.write(message);
+                bWriter.write(string);
                 bWriter.newLine();
                 bWriter.flush();
                 return true;
@@ -73,7 +85,6 @@ public class SimpleServer implements Server {
         int retry = 0;
         while (true) {
             try {
-                play = false;
                 synchronized (serverPool) {
                     serverPool.remove(this);
                 }
@@ -92,7 +103,7 @@ public class SimpleServer implements Server {
         }
     }
 
-    private String readMessage() {
+    private String readString() {
         String message;
         int retry = 0;
         while (true) {
@@ -112,15 +123,23 @@ public class SimpleServer implements Server {
         }
     }
 
-    private void broadCast(String message) {
-        if (auth) {
-            synchronized (serverPool) {
-                for (Server server : serverPool) {
-                    if (!server.equals(this)) {
-                        server.sendMessage(userName + ": " + message);
-                    }
+    private void broadCast(Message message) {
+        synchronized (serverPool) {
+            message.setMessage(userName + ": " + message.getMessage());
+            for (Server server : serverPool) {
+                if (!server.equals(this)) {
+                    if (server.isAuth()) server.sendString(gson.toJson(message));
                 }
             }
+        }
+    }
+
+    private boolean checkString(String line) {
+        if (READING_ERROR.equals(line)) {
+            exit();
+            return false;
+        } else {
+            return true;
         }
     }
 
@@ -142,67 +161,48 @@ public class SimpleServer implements Server {
         }
     }
 
-    private void setPasswordHash(String passwordHash) {
-        this.passwordHash = passwordHash;
-    }
-
-    private String checkMessage(String message) {
-        switch (message) {
-            case READING_ERROR:
-                exit();
-                return null;
-            default:
-                if (message.startsWith(LOGIN_AND_HASH_CODE_PASSWORD)) {
-                    String[] auths = message.split("\\u0005");
-                    int index = auths.length;
-                    int login = setUserName(auths[index - 2], auths[index - 1]);
-                    switch (login) {
-                        case 1:
-                            sendMessage(REGISTER_OK + userName + "\u0005" + passwordHash);
-                            auth = true;
-                            return "autorized";
-                        case 2:
-                            sendMessage(AUTH_OK + userName + "\u0005" + passwordHash);
-                            auth = true;
-                            return "registered";
-                        case 3:
-                            sendMessage(INCORRECT_PASSWORD);
-                            return "incorrect password";
-                    }
-                }
-                return message;
+    private void authenticator() {
+        while (true) {
+            Message message = new Message(SYSTEM, LOGINANDPASSWORD_REQUEST);
+            if (!sendString(gson.toJson(message))) {
+                return;
+            }
+            String string = readString();
+            if (!checkString(string)) {
+                return;
+            }
+            message = gson.fromJson(string, Message.class);
+            switch (setUserName(message.getLogin(), message.getPasswordHash())) {
+                case 1:
+                    if (!sendString(gson.toJson(new Message(SYSTEM, REGISTER_ACCEPT_OK, message.getLogin(), message.getPasswordHash())))) return;
+                    auth = true;
+                    System.out.println(userName + " registered on server");
+                    return;
+                case 2:
+                    if (!sendString(gson.toJson(new Message(SYSTEM, AUTH_ACCEPT_OK, message.getLogin(), message.getPasswordHash())))) return;
+                    auth = true;
+                    System.out.println(userName + " authenticated on server");
+                    return;
+                case 3:
+                    if (!sendString(gson.toJson(new Message(SYSTEM, INCORRECT_PASSWORD)))) return;
+                    continue;
+            }
         }
     }
 
     @Override
     public void run() {
-        if (!sendMessage(LOGINANDPASSWORD_REQUEST)) {
-            return;
-        }
-        String message;
-        while (true) {
-            message = readMessage();
-            if ((message = checkMessage(message)) != null) {
-                broadCast(message);
-                System.out.println(userName + ": " + message);
-            } else {
+        authenticator();
+        String string;
+        while (auth) {
+            string = readString();
+            if (!checkString(string)) {
                 return;
+            } else {
+                Message message = gson.fromJson(string, Message.class);
+                System.out.println(userName + ": " + message.getMessage());
+                broadCast(message);
             }
         }
     }
 }
-
-//    sendMessage("Hi, " + userName);
-//        sendMessage("Input name:");
-//        while (true) {
-//            if ((message = readMessage()) != null) {
-//                if (setUserName(message)) {
-//                    System.out.println(userName + " connected to server");
-//                    break;
-//                } else {
-//                    sendMessage("This name " + message + " is busy. Choose another nickname");
-//                }
-//            } else {
-//                break;
-//            }
-//        }
