@@ -1,7 +1,9 @@
 package client;
 
 import common.Message;
-import java.io.IOException;
+
+import java.io.*;
+
 import static common.SystemMessages.*;
 
 public class ReaderClient implements Client {
@@ -12,28 +14,41 @@ public class ReaderClient implements Client {
         this.clientData = clientData;
     }
 
+    private String showForUser() {
+        switch (clientData.getState()) {
+            case STATE_NOT_AUTHORIZED:
+                return "Input login:";
+            case STATE_CONNECTED_AGAIN:
+                return "Press 'Enter' for authentication";
+            default:
+                return "";
+        }
+    }
+
     private String readString() {
         String string;
         int retry = 0;
         while (true) {
             try {
-                while ((string = clientData.getbReader().readLine()) != null) {
-                    return string;
-                }
+                int lenght = clientData.getInStream().read();
+                byte[] result = new byte[lenght];
+                clientData.getInStream().read(result);
+                return new String(result);
             } catch (IOException e) {
                 retry++;
-                if (retry > 3) {
+                if (retry > 5) {
                     if (reConnect()) {
-                        string = clientData.getGson().toJson(new Message(USER, "Connection restored"));
-                        if (clientData.getState() == STATE_NOT_AUTHORIZED) {
-                            System.out.println("Input login:");
-                        }
+                        string = clientData.getGson().toJson(new Message(USER, "\nConnection restored. " + showForUser()));
                         return string;
                     } else {
                         return READING_ERROR;
                     }
                 } else {
-                    System.out.println("Message reading error. Retry " + retry);
+                    if (retry == 1) {
+                        System.out.print("Reading message...");
+                    } else {
+                        System.out.print(".");
+                    }
                     clientData.sleep(200);
                 }
             }
@@ -48,11 +63,16 @@ public class ReaderClient implements Client {
                 return true;
             } catch (IOException e) {
                 retry++;
-                if (retry > 3) {
+                if (retry > 5) {
+                    System.out.printf(" Can't connection to '%s:%d'. Exit!\n", clientData.getAddress(), clientData.getPort());
                     return false;
                 } else {
-                    System.out.printf("Connection to '%s:%d'. Retry %d\n", clientData.getAddress(), clientData.getPort(), retry);
-                    clientData.sleep(1000);
+                    if (retry == 1) {
+                        System.out.printf("\nConnection to '%s:%d'...", clientData.getAddress(), clientData.getPort(), retry);
+                    } else {
+                        System.out.print(".");
+                    }
+                    clientData.sleep(500);
                 }
             }
         }
@@ -95,6 +115,42 @@ public class ReaderClient implements Client {
                 System.out.println("Authentication... FAIL! Incorrect password");
                 clientData.setState(STATE_NOT_AUTHORIZED);
                 break;
+
+            case READY_TO_TRANSFER_FILE:
+                receiveFile(message.getOption());
+                break;
+        }
+    }
+
+    private void receiveFile(String fileName) {
+        int retry = 0;
+        while (true) {
+            try {
+                File file = new File("Downloads/" + fileName);
+                FileOutputStream fileOutStream = new FileOutputStream(file);
+                int length;
+                while (true) {
+                    if ((length = clientData.getInStream().read()) == 0) {
+                        break;
+                    }
+                    byte[] buffer = new byte[length];
+                    length = clientData.getInStream().read(buffer);
+                    fileOutStream.write(buffer, 0, length);
+                }
+                fileOutStream.flush();
+                fileOutStream.close();
+                System.out.println(String.format("File %s received sucessful.", fileName));
+                return;
+            } catch (IOException e) {
+                retry++;
+                if (retry > 5) {
+                    System.out.println("Can't receive file. Interrupted.");
+                    return;
+                } else {
+                    if (retry == 1) System.out.print("Receiving file ...");
+                    System.out.print(".");
+                }
+            }
         }
     }
 

@@ -4,6 +4,7 @@ public class Message {
 
     private String type;
     private String message;
+    private String option;
     private String login;
     private String passwordHash;
 
@@ -12,10 +13,10 @@ public class Message {
         this.message = message;
     }
 
-    public Message(String type, String message, String login) {
+    public Message(String type, String message, String option) {
         this.type = type;
         this.message = message;
-        this.login = login;
+        this.option = option;
     }
 
     public Message(String type, String message, String login, String passwordHash) {
@@ -25,12 +26,12 @@ public class Message {
         this.passwordHash = passwordHash;
     }
 
-    public String getType() {
-        return type;
+    public String getOption() {
+        return option;
     }
 
-    public void setType(String type) {
-        this.type = type;
+    public String getType() {
+        return type;
     }
 
     public String getMessage() {
@@ -45,15 +46,8 @@ public class Message {
         return login;
     }
 
-    public void setLogin(String login) {
-        this.login = login;
-    }
-
     public String getPasswordHash() {
         return passwordHash;
     }
 
-    public void setPasswordHash(String passwordHash) {
-        this.passwordHash = passwordHash;
-    }
 }

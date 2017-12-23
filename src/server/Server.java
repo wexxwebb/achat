@@ -4,5 +4,6 @@ public interface Server extends Runnable {
 
     boolean sendString(String string);
     boolean isAuth();
+    String getRoom();
 
 }

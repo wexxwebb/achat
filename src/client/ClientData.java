@@ -15,8 +15,8 @@ public class ClientData {
     private String name;
     private String passwordHash;
     private Socket socket;
-    private BufferedReader bReader;
-    private BufferedWriter bWriter;
+    private InputStream inStream;
+    private OutputStream outStream;
     private volatile boolean play = true;
     private volatile int state;
     private GsonBuilder gsonBuilder = new GsonBuilder();
@@ -38,8 +38,8 @@ public class ClientData {
 
     public void connect() throws IOException {
         this.socket = new Socket(address, port);
-        this.bReader = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
-        this.bWriter = new BufferedWriter(new OutputStreamWriter(this.socket.getOutputStream()));
+        this.inStream = new BufferedInputStream(socket.getInputStream());
+        this.outStream = new BufferedOutputStream(socket.getOutputStream());
         if (state == STATE_AUTH_OK || state == STATE_REGISTER_OK) {
             this.state = STATE_CONNECTED_AGAIN;
         } else {
@@ -51,8 +51,8 @@ public class ClientData {
         int retry = 0;
         while (true) {
             try {
-                bReader.close();
-                bWriter.close();
+                inStream.close();
+                outStream.close();
                 socket.close();
                 setPlay(false);
                 synchronized (this) {
@@ -99,12 +99,12 @@ public class ClientData {
         this.play = play;
     }
 
-    public BufferedReader getbReader() {
-        return bReader;
+    public InputStream getInStream() {
+        return inStream;
     }
 
-    public BufferedWriter getbWriter() {
-        return bWriter;
+    public OutputStream getOutStream() {
+        return outStream;
     }
 
     public String getAddress() {

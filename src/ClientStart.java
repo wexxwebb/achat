@@ -18,7 +18,9 @@ public class ClientStart {
         connection:
         while (true) {
             try {
-                System.out.printf("Connection to '%s:%d...", clientData.getAddress(), clientData.getPort());
+                if (retry == 0) {
+                    System.out.printf("Connection to '%s:%d...", clientData.getAddress(), clientData.getPort());
+                }
                 clientData.connect();
                 System.out.println("Success!");
                 Client reader = new ReaderClient(clientData);
@@ -30,12 +32,11 @@ public class ClientStart {
                 break;
             } catch (IOException e) {
                 retry++;
-                if (retry < 3) {
-                    System.out.printf("Can't create socket '%s:%d'. Retry %d\n",
-                            clientData.getAddress(), clientData.getPort(), retry);
+                if (retry < 5) {
+                    System.out.print(".");
                     continue;
                 } else {
-                    System.out.printf("Can't create socket '%s:%d'. Sysytem message: '%s'\n",
+                    System.out.printf("\nCan't create socket '%s:%d'. Sysytem message: '%s'\n",
                             clientData.getAddress(), clientData.getPort(), e.getMessage());
                     System.out.println("Press enter to retry, type 'address:port' to change, type 'exit' to exit");
                     parseInt:
