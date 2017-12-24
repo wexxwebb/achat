@@ -1,6 +1,8 @@
 package client;
 
 import common.Message;
+import common.fileTransport.ReceiveFile;
+import common.fileTransport.Receiver;
 
 import java.io.*;
 
@@ -30,8 +32,8 @@ public class ReaderClient implements Client {
         int retry = 0;
         while (true) {
             try {
-                int lenght = clientData.getInStream().read();
-                byte[] result = new byte[lenght];
+                int length = clientData.getInStream().read();
+                byte[] result = new byte[length];
                 clientData.getInStream().read(result);
                 return new String(result);
             } catch (IOException e) {
@@ -117,40 +119,13 @@ public class ReaderClient implements Client {
                 break;
 
             case READY_TO_TRANSFER_FILE:
-                receiveFile(message.getOption());
-                break;
-        }
-    }
-
-    private void receiveFile(String fileName) {
-        int retry = 0;
-        while (true) {
-            try {
-                File file = new File("Downloads/" + fileName);
-                FileOutputStream fileOutStream = new FileOutputStream(file);
-                int length;
-                while (true) {
-                    if ((length = clientData.getInStream().read()) == 0) {
-                        break;
-                    }
-                    byte[] buffer = new byte[length];
-                    length = clientData.getInStream().read(buffer);
-                    fileOutStream.write(buffer, 0, length);
-                }
-                fileOutStream.flush();
-                fileOutStream.close();
-                System.out.println(String.format("File %s received sucessful.", fileName));
-                return;
-            } catch (IOException e) {
-                retry++;
-                if (retry > 5) {
-                    System.out.println("Can't receive file. Interrupted.");
-                    return;
+                Receiver fileReceiver = new ReceiveFile(clientData.getInStream(), "Downloads/");
+                if (fileReceiver.receive(message.getOption())) {
+                    System.out.println("File " + message.getOption() + " received successful.");
                 } else {
-                    if (retry == 1) System.out.print("Receiving file ...");
-                    System.out.print(".");
+                    System.out.println("File transmitting error.");
                 }
-            }
+                break;
         }
     }
 

@@ -1,13 +1,12 @@
 package server;
 
-import client.FileFounder;
+import common.fileTransport.*;
 import common.Message;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import java.io.*;
 import java.net.Socket;
-import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -20,8 +19,8 @@ public class SimpleServer implements Server {
 
     private Socket socket;
     private final BlockingQueue<Server> serverPool;
-    private InputStream inStream;
-    private OutputStream outStream;
+    private BufferedInputStream inStream;
+    private BufferedOutputStream outStream;
     private String userName = "Unknown";
     private String passwordHash;
     private boolean auth = false;
@@ -77,10 +76,11 @@ public class SimpleServer implements Server {
                 outStream.flush();
                 return true;
             } catch (IOException e) {
+                retry++;
                 if (retry > 3) {
                     return false;
                 } else {
-                    System.out.println("Can't send message. Try " + ++retry);
+                    System.out.println("Can't send message. Try " + retry);
                     sleep(200);
                 }
             }
@@ -254,39 +254,6 @@ public class SimpleServer implements Server {
         return new Message(USER, "unknow command");
     }
 
-    private void receiveFile(String fileName) {
-        int retry = 0;
-        while (true) {
-            try {
-                File file = new File("ReceivedFiles/" + fileName);
-                FileOutputStream fileOutStream = new FileOutputStream(file);
-                int length;
-                while (true) {
-                    if ((length = inStream.read()) == 0) {
-                        break;
-                    }
-                    byte[] buffer = new byte[length];
-                    length = inStream.read(buffer);
-                    fileOutStream.write(buffer, 0, length);
-                }
-                fileOutStream.flush();
-                fileOutStream.close();
-                System.out.println(String.format("%s transfer file %s sucessful", userName, fileName));
-                broadCastAll(new Message(USER, String.format("%s shared file %s. Type '_download %s' to download this.file", userName, fileName, fileName)));
-                return;
-            } catch (IOException e) {
-                retry++;
-                if (retry > 5) {
-                    System.out.println("Can't receive file. Interrupted.");
-                    return;
-                } else {
-                    if (retry == 1) System.out.print("Receiving file...");
-                    System.out.print(".");
-                }
-            }
-        }
-    }
-
     private List<String> getFileList() {
         FileFounder fileFounder = new FileFounder();
         return fileFounder.getFileList("ReceivedFiles");
@@ -301,39 +268,6 @@ public class SimpleServer implements Server {
         }
         result.append("Type '_download <file_name> to download file'");
         return new Message(USER, result.toString());
-    }
-
-    private void transferFile(String fileName) {
-        File file = new File("ReceivedFiles/" + fileName);
-        int retry = 0;
-        while (true) {
-            try {
-                FileInputStream fileInStream = new FileInputStream(file);
-                byte[] buffer = new byte[127];
-                int length;
-                while ((length = fileInStream.read(buffer)) != -1) {
-                    outStream.write(length);
-                    outStream.write(buffer,0, length);
-                }
-                outStream.write(0);
-                outStream.flush();
-                fileInStream.close();
-                System.out.println("File " + file.getName() + " transfered. to " + userName);
-                return;
-            } catch (IOException e) {
-                retry++;
-                if (retry > 5) {
-                    System.out.printf("Can't read file %s for transfer. Interrupted\n", file.getAbsolutePath());
-                } else {
-                    if (retry == 1) {
-                        System.out.printf("Opening file %s...\n", file.getName());
-                    } else {
-                        System.out.print(".");
-                    }
-                    sleep(500);
-                }
-            }
-        }
     }
 
     private void parseMessage(String string) {
@@ -355,14 +289,25 @@ public class SimpleServer implements Server {
                         break;
 
                     case SEND_FILE:
-                        receiveFile(message.getOption());
+                        Receiver receiveFile = new ReceiveFile(inStream, "ReceivedFiles/");
+                        if (receiveFile.receive(message.getOption())) {
+                            System.out.println("File " + message.getOption() + " received successful.");
+                            broadCastAll(new Message(USER, userName + " shared file " + message.getOption()));
+                        } else {
+                            System.out.println("File receiving error.");
+                        }
                         break;
 
                     case DOWNLOAD:
                         if (getFileList().contains(message.getOption())) {
                             json = gson.toJson(new Message(SYSTEM, READY_TO_TRANSFER_FILE, message.getOption()));
                             sendString(json);
-                            transferFile(message.getOption());
+                            Transmitter transferFile = new TransferFile(outStream, "ReceivedFiles/");
+                            if (transferFile.transfer(message.getOption())) {
+                                System.out.println("File " + message.getOption() + " transfered sucessful.");
+                            } else {
+                                System.out.println("File transmitting error.");
+                            }
                         }
                         break;
                     case FILE_LIST:

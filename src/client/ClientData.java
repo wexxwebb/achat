@@ -15,8 +15,8 @@ public class ClientData {
     private String name;
     private String passwordHash;
     private Socket socket;
-    private InputStream inStream;
-    private OutputStream outStream;
+    private BufferedInputStream inStream;
+    private BufferedOutputStream outStream;
     private volatile boolean play = true;
     private volatile int state;
     private GsonBuilder gsonBuilder = new GsonBuilder();
@@ -99,11 +99,11 @@ public class ClientData {
         this.play = play;
     }
 
-    public InputStream getInStream() {
+    public BufferedInputStream getInStream() {
         return inStream;
     }
 
-    public OutputStream getOutStream() {
+    public BufferedOutputStream getOutStream() {
         return outStream;
     }
 

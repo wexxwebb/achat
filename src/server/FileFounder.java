@@ -1,4 +1,4 @@
-package client;
+package server;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -11,13 +11,13 @@ public class FileFounder {
     private class FileVisitor extends SimpleFileVisitor<Path> {
 
         @Override
-        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-            fileList.add(file.getFileName().toString());
+        public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) {
+            fileList.add(path.getFileName().toString());
             return FileVisitResult.CONTINUE;
         }
     }
 
-    List<String> fileList;
+    private List<String> fileList;
 
     public FileFounder() {
         fileList = new ArrayList<>();

@@ -1,6 +1,8 @@
 package client;
 
 import common.Message;
+import common.fileTransport.TransferFile;
+import common.fileTransport.Transmitter;
 
 import java.io.*;
 import java.util.Scanner;
@@ -40,38 +42,6 @@ public class WriterClient implements Client {
         }
     }
 
-    private void transferFile(File file) {
-        int retry = 0;
-        while (true) {
-            try {
-                FileInputStream fileInStream = new FileInputStream(file);
-                byte[] buffer = new byte[127];
-                int length;
-                while ((length = fileInStream.read(buffer)) != -1) {
-                    clientData.getOutStream().write(length);
-                    clientData.getOutStream().write(buffer,0, length);
-                }
-                clientData.getOutStream().write(0);
-                clientData.getOutStream().flush();
-                fileInStream.close();
-                System.out.println("File " + file.getName() + " transfered.");
-                return;
-            } catch (IOException e) {
-                retry++;
-                if (retry > 5) {
-                    System.out.printf("Can't open file %s for transfer. Interrupted\n", file.getAbsolutePath());
-                } else {
-                    if (retry == 1) {
-                        System.out.printf("Opening file %s...\n", file.getName());
-                    } else {
-                        System.out.print(".");
-                    }
-                    clientData.sleep(500);
-                }
-            }
-        }
-    }
-
     private void normSending(String string) {
         String json;
         String[] s = string.split(" ");
@@ -93,7 +63,12 @@ public class WriterClient implements Client {
                     File file = new File(s[1]);
                     json = clientData.getGson().toJson(new Message(SYSTEM, SEND_FILE, file.getName()));
                     send(json);
-                    transferFile(file);
+                    Transmitter transferFile = new TransferFile(clientData.getOutStream());
+                    if (transferFile.transfer(file.getAbsolutePath())) {
+                        System.out.println("File " + file.getName() + " transmitted successful.");
+                    } else {
+                        System.out.println("File transmitting error.");
+                    }
                 } else {
                     System.out.println("Unknown command");
                 }
