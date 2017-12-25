@@ -4,6 +4,7 @@ import common.fileTransport.*;
 import common.Message;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import server.logging.Logging;
 
 import java.io.*;
 import java.net.Socket;
@@ -15,8 +16,10 @@ import java.util.concurrent.BlockingQueue;
 
 import static common.SystemMessages.*;
 
+@Logging
 public class SimpleServer implements Server {
 
+    private Server loggedServer;
     private Socket socket;
     private final BlockingQueue<Server> serverPool;
     private BufferedInputStream inStream;
@@ -52,10 +55,15 @@ public class SimpleServer implements Server {
         }
     }
 
+    public void setLoggedServer(Server loggedServer) {
+        this.loggedServer = loggedServer;
+    }
+
     public void setRoom(String room) {
         this.room = room;
     }
 
+    @Override
     public String getRoom() {
         return room;
     }
@@ -322,10 +330,15 @@ public class SimpleServer implements Server {
                 }
             break;
             case USER:
-                System.out.println(userName + ": " + message.getMessage());
+                loggedServer.print(userName + ": " + message.getMessage());
                 broadCastRoom(message);
                 break;
         }
+    }
+
+    @Override
+    public void print(String string) {
+        System.out.println(string);
     }
 
     @Override

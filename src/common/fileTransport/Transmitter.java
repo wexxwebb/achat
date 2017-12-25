@@ -2,6 +2,6 @@ package common.fileTransport;
 
 public interface Transmitter {
 
-    boolean transfer(String fileName);
+    public boolean transfer(String fileName);
 
 }
