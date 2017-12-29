@@ -31,6 +31,7 @@ public class SimpleServer implements Server {
     private GsonBuilder gsonBuilder;
     private Gson gson;
     private String room = "all";
+    private boolean exit = false;
 
     public SimpleServer(Socket socket, BlockingQueue<Server> serverPool, Map<String, String> users) {
         this.socket = socket;
@@ -76,7 +77,7 @@ public class SimpleServer implements Server {
     @Override
     public boolean sendString(String string) {
         int retry = 0;
-        while (true) {
+        while (!exit) {
             try {
                 byte[] temp = string.getBytes();
                 outStream.write(temp.length);
@@ -93,6 +94,7 @@ public class SimpleServer implements Server {
                 }
             }
         }
+        return true;
     }
 
     @SuppressWarnings("SameParameterValue")
@@ -111,6 +113,8 @@ public class SimpleServer implements Server {
                 synchronized (serverPool) {
                     serverPool.remove(this);
                 }
+                inStream.close();
+                outStream.close();
                 socket.close();
                 System.out.printf("%s disconnected from server\n", userName);
                 return;
@@ -128,7 +132,7 @@ public class SimpleServer implements Server {
 
     private String readString() {
         int retry = 0;
-        while (true) {
+        while (!exit) {
             try {
                 int length = inStream.read();
                 byte[] temp = new byte[length];
@@ -144,6 +148,7 @@ public class SimpleServer implements Server {
                 }
             }
         }
+        return gson.toJson(new Message(SYSTEM, ""));
     }
 
     private void broadCastRoom(Message message) {
@@ -211,13 +216,15 @@ public class SimpleServer implements Server {
             message = gson.fromJson(string, Message.class);
             switch (setUserName(message.getLogin(), message.getPasswordHash())) {
                 case REGISTER:
-                    if (!sendString(gson.toJson(new Message(SYSTEM, REGISTER_ACCEPT_OK, message.getLogin(), message.getPasswordHash())))) return;
+                    if (!sendString(gson.toJson(new Message(SYSTEM, REGISTER_ACCEPT_OK, message.getLogin(), message.getPasswordHash()))))
+                        return;
                     auth = true;
                     System.out.println(userName + " registered on server");
                     broadCastAll(new Message(USER, userName + " registered on server"));
                     return;
                 case AUTHENTICATED:
-                    if (!sendString(gson.toJson(new Message(SYSTEM, AUTH_ACCEPT_OK, message.getLogin(), message.getPasswordHash())))) return;
+                    if (!sendString(gson.toJson(new Message(SYSTEM, AUTH_ACCEPT_OK, message.getLogin(), message.getPasswordHash()))))
+                        return;
                     auth = true;
                     System.out.println(userName + " authenticated on server");
                     broadCastAll(new Message(USER, userName + " authenticated on server"));
@@ -281,6 +288,7 @@ public class SimpleServer implements Server {
     private void parseMessage(String string) {
         String json;
         Message message = gson.fromJson(string, Message.class);
+        //pattern command
         switch (message.getType()) {
             case SYSTEM:
                 switch (message.getMessage()) {
@@ -322,13 +330,19 @@ public class SimpleServer implements Server {
                         json = gson.toJson(getFiles());
                         sendString(json);
                         break;
+                    case EXIT:
+                        broadCastAll(new Message(USER, userName + " disconnected from server"));
+                        json = gson.toJson(new Message(SYSTEM, EXIT));
+                        sendString(json);
+                        exit = true;
+                        exit();
 
                     default:
                         json = gson.toJson(unknownCommand());
                         sendString(json);
                         break;
                 }
-            break;
+                break;
             case USER:
                 loggedServer.print(userName + ": " + message.getMessage());
                 broadCastRoom(message);

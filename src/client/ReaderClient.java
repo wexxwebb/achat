@@ -51,7 +51,7 @@ public class ReaderClient implements Client {
                     } else {
                         System.out.print(".");
                     }
-                    clientData.sleep(200);
+                    clientData.sleep(1000);
                 }
             }
         }
@@ -74,7 +74,7 @@ public class ReaderClient implements Client {
                     } else {
                         System.out.print(".");
                     }
-                    clientData.sleep(500);
+                    clientData.sleep(1000);
                 }
             }
         }
@@ -125,6 +125,9 @@ public class ReaderClient implements Client {
                 } else {
                     System.out.println("File transmitting error.");
                 }
+                break;
+            case EXIT:
+                clientData.exit();
                 break;
         }
     }

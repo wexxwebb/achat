@@ -10,6 +10,7 @@ public class SystemMessages {
     public static final int STATE_CONNECTED_AGAIN = 5;
     public static final int STATE_SEND_LOGIN_PASSWORD = 6;
 
+    public static final String EXIT = "_exit";
     public static final String FILE_LIST = "_files";
     public static final String READY_TO_TRANSFER_FILE = "READY_TO_TRANSFER_FILE";
     public static final String DOWNLOAD = "_download";

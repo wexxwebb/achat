@@ -85,7 +85,10 @@ public class WriterClient implements Client {
                 json = clientData.getGson().toJson(new Message(SYSTEM, FILE_LIST));
                 send(json);
                 break;
-
+            case EXIT:
+                json = clientData.getGson().toJson(new Message(SYSTEM, EXIT));
+                send(json);
+                break;
             default:
                 json = clientData.getGson().toJson(new Message(USER, string));
                 send(json);
