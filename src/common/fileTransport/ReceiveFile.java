@@ -1,5 +1,7 @@
 package common.fileTransport;
 
+import common.decoder.Decoder;
+
 import java.io.BufferedInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -31,8 +33,11 @@ public class ReceiveFile implements Receiver {
             try {
                 int length;
                 fileOutputStream = new FileOutputStream(destination  + fileName);
+                byte[] lengthAsByteArray = new byte[4];
                 while (true) {
-                    length = input.read();
+                    lengthAsByteArray = Decoder.initArray(lengthAsByteArray);
+                    input.read(lengthAsByteArray);
+                    length = Decoder.byteArrayAsInt(lengthAsByteArray);
                     if (length == 0) break;
                     byte[] buffer = new byte[length];
                     input.read(buffer);

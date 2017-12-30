@@ -1,5 +1,7 @@
 package common.fileTransport;
 
+import common.decoder.Decoder;
+
 import java.io.*;
 
 public class TransferFile implements Transmitter {
@@ -24,15 +26,15 @@ public class TransferFile implements Transmitter {
             try {
                 FileInputStream fileInputStream = new FileInputStream(sourceFolder + fileName);
                 int length;
-                byte[] buffer = new byte[127];
+                byte[] buffer = new byte[8192];
                 while (true) {
-                   length = fileInputStream.read(buffer);
-                   if (length == -1) {
-                       output.write(0);
-                       break;
-                   }
-                   output.write(length);
-                   output.write(buffer, 0, length);
+                    length = fileInputStream.read(buffer);
+                    if (length == -1) {
+                        output.write(0);
+                        break;
+                    }
+                    output.write(Decoder.intAsByteArray(length));
+                    output.write(buffer, 0, length);
                 }
                 fileInputStream.close();
                 output.flush();
