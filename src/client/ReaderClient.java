@@ -42,6 +42,7 @@ public class ReaderClient implements Client {
                 if (retry > 5) {
                     if (reConnect()) {
                         string = clientData.getGson().toJson(new Message(USER, "\nConnection restored. " + showForUser()));
+                        clientData.setState(STATE_SEND_LOGIN_PASSWORD);
                         return string;
                     } else {
                         return READING_ERROR;
@@ -72,7 +73,7 @@ public class ReaderClient implements Client {
                     return false;
                 } else {
                     if (retry == 1) {
-                        System.out.printf("\nConnection to '%s:%d'...", clientData.getAddress(), clientData.getPort(), retry);
+                        System.out.printf("\nConnection to '%s:%d'...", clientData.getAddress(), clientData.getPort());
                     } else {
                         System.out.print(".");
                     }
@@ -93,20 +94,6 @@ public class ReaderClient implements Client {
 
     private void handleSysMessages(Message message) {
         switch (message.getMessage()) {
-            case LOGINANDPASSWORD_REQUEST:
-                switch (clientData.getState()) {
-
-                    case STATE_CONNECTED:
-                        System.out.println("Input login:");
-                        clientData.setState(STATE_NOT_AUTHORIZED);
-                        break;
-
-                    case STATE_CONNECTED_AGAIN:
-                        clientData.setState(STATE_SEND_LOGIN_PASSWORD);
-                        break;
-                }
-                break;
-
             case AUTH_ACCEPT_OK:
                 auth_ok(message, "Authentication... OK.");
                 break;

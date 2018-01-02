@@ -5,7 +5,6 @@ import common.Message;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import common.sleep.Sleep;
-import server.logging.Logging;
 
 import java.io.*;
 import java.net.Socket;
@@ -17,7 +16,6 @@ import java.util.concurrent.BlockingQueue;
 
 import static common.SystemMessages.*;
 
-@Logging
 public class SimpleServer implements Server {
 
     private Server loggedServer;
@@ -201,34 +199,48 @@ public class SimpleServer implements Server {
 
     private void authenticator() {
         while (true) {
-            Message message = new Message(SYSTEM, LOGINANDPASSWORD_REQUEST);
-            if (!sendString(gson.toJson(message))) {
-                return;
-            }
             String string = readString();
             if (!checkString(string)) {
                 return;
             }
-            message = gson.fromJson(string, Message.class);
-            switch (setUserName(message.getLogin(), message.getPasswordHash())) {
-                case REGISTER:
-                    if (!sendString(gson.toJson(new Message(SYSTEM, REGISTER_ACCEPT_OK, message.getLogin(), message.getPasswordHash()))))
-                        return;
-                    auth = true;
-                    System.out.println(userName + " registered on server");
-                    broadCastAll(new Message(USER, userName + " registered on server"));
-                    return;
-                case AUTHENTICATED:
-                    if (!sendString(gson.toJson(new Message(SYSTEM, AUTH_ACCEPT_OK, message.getLogin(), message.getPasswordHash()))))
-                        return;
-                    auth = true;
-                    System.out.println(userName + " authenticated on server");
-                    broadCastAll(new Message(USER, userName + " authenticated on server"));
-                    return;
-                case DECLINE:
-                    if (!sendString(gson.toJson(new Message(SYSTEM, INCORRECT_PASSWORD)))) return;
-                    continue;
+            Message message = gson.fromJson(string, Message.class);
+
+            switch (message.getMessage()) {
+                case LOGIN_AND_HASH_CODE_PASSWORD:
+                    switch (setUserName(message.getLogin(), message.getPasswordHash())) {
+                        case REGISTER:
+                            if (!sendString(gson.toJson(new Message(SYSTEM, REGISTER_ACCEPT_OK, message.getLogin(), message.getPasswordHash()))))
+                                return;
+                            auth = true;
+                            System.out.println(userName + " registered on server");
+                            broadCastAll(new Message(USER, userName + " registered on server"));
+                            return;
+                        case AUTHENTICATED:
+                            if (!sendString(gson.toJson(new Message(SYSTEM, AUTH_ACCEPT_OK, message.getLogin(), message.getPasswordHash()))))
+                                return;
+                            auth = true;
+                            System.out.println(userName + " authenticated on server");
+                            broadCastAll(new Message(USER, userName + " authenticated on server"));
+                            return;
+                        case DECLINE:
+                            if (!sendString(gson.toJson(new Message(SYSTEM, INCORRECT_PASSWORD)))) return;
+                            continue;
+                    }
+                    break;
+
+                case SEND_FILE:
+                    Receiver receiveFile = new ReceiveFile(inStream, "ReceivedFiles/");
+                    if (receiveFile.receive(message.getOption())) {
+                        System.out.println("File " + message.getOption() + " received successful.");
+                        //broadCastAll(new Message(USER, userName + " shared file " + message.getOption()));
+                        exit = true;
+                        exit();
+                    } else {
+                        System.out.println("File receiving error.");
+                    }
+                    break;
             }
+
         }
     }
 
@@ -300,28 +312,29 @@ public class SimpleServer implements Server {
                         sendString(json);
                         break;
 
-                    case SEND_FILE:
-                        Receiver receiveFile = new ReceiveFile(inStream, "ReceivedFiles/");
-                        if (receiveFile.receive(message.getOption())) {
-                            System.out.println("File " + message.getOption() + " received successful.");
-                            broadCastAll(new Message(USER, userName + " shared file " + message.getOption()));
-                        } else {
-                            System.out.println("File receiving error.");
-                        }
-                        break;
+//                    case SEND_FILE:
+//                        Receiver receiveFile = new ReceiveFile(inStream, "ReceivedFiles/");
+//                        if (receiveFile.receive(message.getOption())) {
+//                            System.out.println("File " + message.getOption() + " received successful.");
+//                            broadCastAll(new Message(USER, userName + " shared file " + message.getOption()));
+//                        } else {
+//                            System.out.println("File receiving error.");
+//                        }
+//                        break;
 
-                    case DOWNLOAD:
-                        if (getFileList().contains(message.getOption())) {
-                            json = gson.toJson(new Message(SYSTEM, READY_TO_TRANSFER_FILE, message.getOption()));
-                            sendString(json);
-                            Transmitter transferFile = new TransferFile(outStream, "ReceivedFiles/");
-                            if (transferFile.transfer(message.getOption())) {
-                                System.out.println("File " + message.getOption() + " transfered sucessful.");
-                            } else {
-                                System.out.println("File transmitting error.");
-                            }
-                        }
-                        break;
+//                    case DOWNLOAD:
+//                        if (getFileList().contains(message.getOption())) {
+//                            json = gson.toJson(new Message(SYSTEM, READY_TO_TRANSFER_FILE, message.getOption()));
+//                            sendString(json);
+//                            Transmitter transferFile = new TransferFile(outStream, "ReceivedFiles/");
+//                            if (transferFile.transfer(message.getOption())) {
+//                                System.out.println("File " + message.getOption() + " transfered sucessful.");
+//                            } else {
+//                                System.out.println("File transmitting error.");
+//                            }
+//                        }
+//                        break;
+
                     case FILE_LIST:
                         json = gson.toJson(getFiles());
                         sendString(json);

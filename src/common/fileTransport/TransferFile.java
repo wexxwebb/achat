@@ -1,6 +1,7 @@
 package common.fileTransport;
 
 import common.decoder.Decoder;
+import common.sleep.Sleep;
 
 import java.io.*;
 
@@ -25,16 +26,14 @@ public class TransferFile implements Transmitter {
         while (true) {
             try {
                 FileInputStream fileInputStream = new FileInputStream(sourceFolder + fileName);
-                int length;
                 byte[] buffer = new byte[8192];
+                int length;
                 while (true) {
                     length = fileInputStream.read(buffer);
                     if (length == -1) {
-                        output.write(Decoder.intAsByteArray(-1));
                         output.flush();
                         break;
                     }
-                    output.write(Decoder.intAsByteArray(length));
                     output.write(buffer, 0, length);
                     output.flush();
                 }

@@ -2,16 +2,13 @@ import common.sleep.Sleep;
 import common.wrap.Result;
 import server.Server;
 import server.SimpleServer;
-import server.logging.Logger;
 
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class ServerStart {
 
@@ -66,8 +63,6 @@ public class ServerStart {
         Result<Integer> port = setPort(args[0], 999);
         if (!port.isSuccess()) return;
 
-        AtomicInteger messagesCount = new AtomicInteger(0);
-
         Result<ServerSocket> serverSocket = setServer(port.get(), 5, 500);
         if (!serverSocket.isSuccess()) {
             return;
@@ -80,15 +75,7 @@ public class ServerStart {
             try {
                 Socket socket = serverSocket.get().accept();
                 Server newServer = new SimpleServer(socket, serverPool, userNames);
-                Logger logger = new Logger(newServer, messagesCount);
-                logger.setLogging(true);
-                Server loggedServer = (Server) Proxy.newProxyInstance(
-                        Logger.class.getClassLoader(),
-                        new Class[]{Server.class},
-                        logger
-                );
-                newServer.setLoggedServer(loggedServer);
-                Thread thread = new Thread(loggedServer);
+                Thread thread = new Thread(newServer);
                 thread.start();
                 synchronized (serverPool) {
                     serverPool.add(newServer);

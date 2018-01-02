@@ -23,16 +23,12 @@ public class ReceiveFile implements Receiver {
         int retry = 0;
         while (true) {
             try {
-                int length;
                 fileOutputStream = new FileOutputStream(destination  + fileName);
-                byte[] lengthAsByteArray = new byte[4];
+                byte[] buffer = new byte[8192];
+                int length;
                 while (true) {
-                    lengthAsByteArray = Decoder.initArray(lengthAsByteArray);
-                    input.read(lengthAsByteArray);
-                    length = Decoder.byteArrayAsInt(lengthAsByteArray);
+                    length = input.read(buffer);
                     if (length == -1) break;
-                    byte[] buffer = new byte[length];
-                    input.read(buffer);
                     fileOutputStream.write(buffer, 0, length);
                 }
                 fileOutputStream.flush();

@@ -39,7 +39,7 @@ public class ClientData {
         if (state == STATE_AUTH_OK || state == STATE_REGISTER_OK) {
             this.state = STATE_CONNECTED_AGAIN;
         } else {
-            this.state = STATE_CONNECTED;
+            this.state = STATE_NOT_AUTHORIZED;
         }
     }
 

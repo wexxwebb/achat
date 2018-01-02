@@ -6,6 +6,7 @@ import common.fileTransport.Transmitter;
 import common.sleep.Sleep;
 
 import java.io.*;
+import java.net.Socket;
 import java.util.Scanner;
 
 import static common.SystemMessages.*;
@@ -20,20 +21,20 @@ public class WriterClient implements Client {
         console = new Scanner(System.in);
     }
 
-    private boolean send(String string) {
+    private boolean send(String string, BufferedOutputStream output) {
         int retry = 0;
         while (true) {
             try {
                 byte[] temp = string.getBytes();
-                clientData.getOutStream().write(temp.length);
-                clientData.getOutStream().write(temp);
-                clientData.getOutStream().flush();
+                output.write(temp.length);
+                output.write(temp);
+                output.flush();
                 return true;
             } catch (IOException e) {
                 retry++;
                 if (retry > 3) {
                     System.out.println("Can't send message");
-                    clientData.exit();
+                    clientData.exit(); //todo need fix not right when file transmitting
                     return false;
                 } else {
                     System.out.println("Problem with send message. Retry " + retry);
@@ -49,12 +50,12 @@ public class WriterClient implements Client {
         switch (s[0]) {
             case SHOW_ROOMS:
                 json = clientData.getGson().toJson(new Message(SYSTEM, SHOW_ROOMS));
-                send(json);
+                send(json, clientData.getOutStream());
                 break;
             case JOIN_ROOM:
                 if (s.length == 2) {
                     json = clientData.getGson().toJson(new Message(SYSTEM, JOIN_ROOM, s[1]));
-                    send(json);
+                    send(json, clientData.getOutStream());
                 } else {
                     System.out.println("Unknown command");
                 }
@@ -63,40 +64,50 @@ public class WriterClient implements Client {
                 if (s.length == 2) {
                     File file = new File(s[1]);
                     if (file.exists()) {
-                        json = clientData.getGson().toJson(new Message(SYSTEM, SEND_FILE, file.getName()));
-                        send(json);
-                        Transmitter transferFile = new TransferFile(clientData.getOutStream());
-                        if (transferFile.transfer(file.getAbsolutePath())) {
-                            System.out.println("File " + file.getName() + " transmitted successful.");
-                        } else {
-                            System.out.println("File transmitting error.");
+                        try {
+                            Socket socket = new Socket(clientData.getAddress(), clientData.getPort());
+                            BufferedOutputStream output = new BufferedOutputStream(socket.getOutputStream());
+                            json = clientData.getGson().toJson(new Message(SYSTEM, SEND_FILE, file.getName()));
+                            send(json, output);
+                            Transmitter transferFile = new TransferFile(output);
+                            if (transferFile.transfer(file.getAbsolutePath())) {
+                                output.close();
+                                socket.close();
+                                System.out.println("File " + file.getName() + " transmitted successful.");
+                            } else {
+                                System.out.println("File transmitting error.");
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace(); //todo handle exception need
                         }
+
                     } else {
-                        System.out.printf("File '%s' not exist.", file.getName());
+                        System.out.printf("File '%s' not exist.\n", file.getName());
                     }
                 } else {
                     System.out.println("Unknown command");
                 }
                 break;
+
             case DOWNLOAD:
                 if (s.length == 2) {
                     json = clientData.getGson().toJson(new Message(SYSTEM, DOWNLOAD, s[1]));
-                    send(json);
+                    send(json, clientData.getOutStream());
                 } else {
                     System.out.println("Unknown command");
                 }
                 break;
             case FILE_LIST:
                 json = clientData.getGson().toJson(new Message(SYSTEM, FILE_LIST));
-                send(json);
+                send(json, clientData.getOutStream());
                 break;
             case EXIT:
                 json = clientData.getGson().toJson(new Message(SYSTEM, EXIT));
-                send(json);
+                send(json, clientData.getOutStream());
                 break;
             default:
                 json = clientData.getGson().toJson(new Message(USER, string));
-                send(json);
+                send(json, clientData.getOutStream());
                 break;
         }
     }
@@ -105,14 +116,13 @@ public class WriterClient implements Client {
         String json;
         String string = console.nextLine();
         switch (clientData.getState()) {
-
             case STATE_NOT_AUTHORIZED:
                 String login = string.trim();
                 System.out.println("Input password");
                 String password = console.nextLine().trim();
                 password = Integer.toString(Integer.toString(password.hashCode() + SALT.hashCode()).hashCode());
                 json = clientData.getGson().toJson(new Message(SYSTEM, LOGIN_AND_HASH_CODE_PASSWORD, login, password));
-                if (!send(json)) {
+                if (!send(json, clientData.getOutStream())) {
                     return;
                 }
                 clientData.setState(STATE_AUTH_REQUEST);
@@ -134,9 +144,15 @@ public class WriterClient implements Client {
 
     @Override
     public void sendLoginPassword() {
-        String json;
-        json = clientData.getGson().toJson(new Message(SYSTEM, LOGIN_AND_HASH_CODE_PASSWORD, clientData.getName(), clientData.getPasswordHash()));
-        if (!send(json)) {
+        String json = clientData.getGson().toJson(
+                new Message(
+                        SYSTEM,
+                        LOGIN_AND_HASH_CODE_PASSWORD,
+                        clientData.getName(),
+                        clientData.getPasswordHash()
+                )
+        );
+        if (!send(json, clientData.getOutStream())) {
             return;
         }
         clientData.setState(STATE_AUTH_REQUEST);
@@ -144,6 +160,7 @@ public class WriterClient implements Client {
 
     @Override
     public void run() {
+        System.out.println("Input login:");
         while (clientData.getPlay()) {
             prepareString();
         }
