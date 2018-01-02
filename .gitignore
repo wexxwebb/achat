@@ -21,7 +21,7 @@
 .idea/
 *.txt
 *.mp3
-
+*.jpg
 out/
 MANIFEST/
 

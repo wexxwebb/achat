@@ -30,14 +30,15 @@ public class TransferFile implements Transmitter {
                 while (true) {
                     length = fileInputStream.read(buffer);
                     if (length == -1) {
-                        output.write(0);
+                        output.write(Decoder.intAsByteArray(-1));
+                        output.flush();
                         break;
                     }
                     output.write(Decoder.intAsByteArray(length));
                     output.write(buffer, 0, length);
+                    output.flush();
                 }
                 fileInputStream.close();
-                output.flush();
                 return true;
             } catch (IOException e) {
                 retry++;

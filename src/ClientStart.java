@@ -8,10 +8,12 @@ import java.util.Scanner;
 
 public class ClientStart {
 
-    static private int port = 5555;
-    static private String address = "127.0.0.1";
+    static private int port;
+    static private String address;
 
     public static void main(String[] args) {
+        address = args[0];
+        port = Integer.parseInt(args[1]);
         Scanner scanner = new Scanner(System.in);
         ClientData clientData = new ClientData(address, port);
         int retry = 0;
@@ -19,7 +21,7 @@ public class ClientStart {
         while (true) {
             try {
                 if (retry == 0) {
-                    System.out.printf("Connection to '%s:%d...", clientData.getAddress(), clientData.getPort());
+                    System.out.printf("Connection to '%s:%d'...", clientData.getAddress(), clientData.getPort());
                 }
                 clientData.connect();
                 System.out.println("Success!");

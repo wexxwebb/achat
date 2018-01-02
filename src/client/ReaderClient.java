@@ -3,6 +3,7 @@ package client;
 import common.Message;
 import common.fileTransport.ReceiveFile;
 import common.fileTransport.Receiver;
+import common.sleep.Sleep;
 
 import java.io.*;
 
@@ -51,10 +52,11 @@ public class ReaderClient implements Client {
                     } else {
                         System.out.print(".");
                     }
-                    clientData.sleep(1000);
+                    Sleep.millis(1000);
                 }
             }
         }
+
     }
 
     private boolean reConnect() {
@@ -74,7 +76,7 @@ public class ReaderClient implements Client {
                     } else {
                         System.out.print(".");
                     }
-                    clientData.sleep(1000);
+                    Sleep.millis(1000);
                 }
             }
         }
@@ -123,7 +125,7 @@ public class ReaderClient implements Client {
                 if (fileReceiver.receive(message.getOption())) {
                     System.out.println("File " + message.getOption() + " received successful.");
                 } else {
-                    System.out.println("File transmitting error.");
+                    System.out.println("File receiving error.");
                 }
                 break;
             case EXIT:

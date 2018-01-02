@@ -4,6 +4,7 @@ import common.fileTransport.*;
 import common.Message;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import common.sleep.Sleep;
 import server.logging.Logging;
 
 import java.io.*;
@@ -50,7 +51,7 @@ public class SimpleServer implements Server {
                     return;
                 } else {
                     System.out.println("Can't establish socket. Retry " + ++retry);
-                    sleep(200);
+                    Sleep.millis(200);
                 }
             }
         }
@@ -86,24 +87,17 @@ public class SimpleServer implements Server {
                 return true;
             } catch (IOException e) {
                 retry++;
-                if (retry > 3) {
+                if (retry > 5) {
+                    System.out.println();
                     return false;
                 } else {
-                    System.out.println("Can't send message. Try " + retry);
-                    sleep(200);
+                    if (retry == 1) System.out.print("Sending message.");
+                    else System.out.print(".");
+                    Sleep.millis(500);
                 }
             }
         }
         return true;
-    }
-
-    @SuppressWarnings("SameParameterValue")
-    private void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
     }
 
     private void exit() {
@@ -124,7 +118,7 @@ public class SimpleServer implements Server {
                     System.out.println("Can't close socket. Thread stopped with error;");
                 } else {
                     System.out.printf("Can't close socket. Retry %d\n", retry);
-                    sleep(200);
+                    Sleep.millis(200);
                 }
             }
         }
@@ -140,11 +134,13 @@ public class SimpleServer implements Server {
                 return new String(temp);
             } catch (IOException e) {
                 retry++;
-                if (retry > 3) {
+                if (retry > 5) {
+                    System.out.println();
                     return READING_ERROR;
                 } else {
-                    System.out.println("Error reading message. Retry " + retry);
-                    sleep(200);
+                    if (retry == 1) System.out.print("Reading message.");
+                    else System.out.print(".");
+                    Sleep.millis(500);
                 }
             }
         }

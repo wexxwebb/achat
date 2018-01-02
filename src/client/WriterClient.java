@@ -3,6 +3,7 @@ package client;
 import common.Message;
 import common.fileTransport.TransferFile;
 import common.fileTransport.Transmitter;
+import common.sleep.Sleep;
 
 import java.io.*;
 import java.util.Scanner;
@@ -36,7 +37,7 @@ public class WriterClient implements Client {
                     return false;
                 } else {
                     System.out.println("Problem with send message. Retry " + retry);
-                    clientData.sleep(200);
+                    Sleep.millis(200);
                 }
             }
         }
@@ -61,13 +62,17 @@ public class WriterClient implements Client {
             case SEND_FILE:
                 if (s.length == 2) {
                     File file = new File(s[1]);
-                    json = clientData.getGson().toJson(new Message(SYSTEM, SEND_FILE, file.getName()));
-                    send(json);
-                    Transmitter transferFile = new TransferFile(clientData.getOutStream());
-                    if (transferFile.transfer(file.getAbsolutePath())) {
-                        System.out.println("File " + file.getName() + " transmitted successful.");
+                    if (file.exists()) {
+                        json = clientData.getGson().toJson(new Message(SYSTEM, SEND_FILE, file.getName()));
+                        send(json);
+                        Transmitter transferFile = new TransferFile(clientData.getOutStream());
+                        if (transferFile.transfer(file.getAbsolutePath())) {
+                            System.out.println("File " + file.getName() + " transmitted successful.");
+                        } else {
+                            System.out.println("File transmitting error.");
+                        }
                     } else {
-                        System.out.println("File transmitting error.");
+                        System.out.printf("File '%s' not exist.", file.getName());
                     }
                 } else {
                     System.out.println("Unknown command");
@@ -96,7 +101,7 @@ public class WriterClient implements Client {
         }
     }
 
-    public void prepareString() {
+    private void prepareString() {
         String json;
         String string = console.nextLine();
         switch (clientData.getState()) {

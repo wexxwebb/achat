@@ -1,3 +1,5 @@
+import common.sleep.Sleep;
+import common.wrap.Result;
 import server.Server;
 import server.SimpleServer;
 import server.logging.Logger;
@@ -13,47 +15,70 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class ServerStart {
 
-    private static int port = 5555;
     private static BlockingQueue<Server> serverPool = new ArrayBlockingQueue<>(10000);
-    private static ServerSocket serverSocket;
     private static Map<String, String> userNames = new HashMap<>();
+    private static Scanner console = new Scanner(System.in);
 
-    public static void main(String[] args) {
-
-        AtomicInteger messagesCount = new AtomicInteger(0);
-
-        Scanner console = new Scanner(System.in);
-        create: while (true) {
-            try {
-                serverSocket = new ServerSocket(port);
-                System.out.println("Server established on port " + port);
-                System.out.println("Server expects connections...");
-                break create;
-            } catch (IOException e) {
-                System.out.println("Can't establish server");
-                System.out.println(e.getMessage());
-                System.out.println("Probably, port " + port + " already in use");
-                System.out.println("Press Enter to retry, type new port and press enter, type 'exit' to exit");
-                while (true) {
-                    String com = console.nextLine();
-                    if (com.equals("exit")) {
-                        return;
-                    } else if (com.isEmpty()) {
-                        continue create;
-                    } else {
-                        try {
-                            port = Integer.parseInt(com);
-                            break;
-                        } catch (NumberFormatException e1) {
-                            System.out.println("Type number only to change port or 'exit' to exit");
-                        }
-                    }
+    private static Result<Integer> setPort(String strPort, int retryLimit) {
+        if ("exit".equals(strPort)) {
+            return new Result<>(null, false, "Exit");
+        } else {
+            if (strPort.matches("\\b[0-9]+\\b")) {
+                int port = Integer.parseInt(strPort);
+                return new Result<>(port, true, String.format("Port set to '%d' successful", port));
+            } else {
+                retryLimit--;
+                if (retryLimit < 0) return new Result<>(0, false, "Exit but retry limit is over");
+                else {
+                    System.out.printf("Can't parse argument: '%s' (may be number only). Input new port or 'exit' to exit\n", strPort);
+                    return setPort(console.nextLine(), retryLimit);
                 }
             }
         }
+    }
+
+    private static Result<ServerSocket> setServer(int port, int retryLimit, long latency) {
+        int retry = 0;
         while (true) {
             try {
-                Socket socket = serverSocket.accept();
+                return new Result<>(new ServerSocket(port), true, String.format("Server established on port '%s' successful", port));
+            } catch (IOException e) {
+                retry++;
+                if (retry > retryLimit) {
+                    System.out.println(e.getMessage());
+                    System.out.println("Press 'Enter' to retry, input new port to change, input 'exit' to exit");
+                    String string = console.nextLine();
+                    if (string.isEmpty()) return setServer(port, retryLimit, 500);
+                    else {
+                        Result<Integer> newPort = setPort(string, 999);
+                        if (newPort.get() == null) return new Result<>(null, false, newPort.getMessage());
+                        return setServer(newPort.get(), 5, 500);
+                    }
+                } else if (retry == 1) System.out.printf("Establishing server on port '%d'.", port);
+                else System.out.print(".");
+                Sleep.millis(latency);
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+
+        Result<Integer> port = setPort(args[0], 999);
+        if (!port.isSuccess()) return;
+
+        AtomicInteger messagesCount = new AtomicInteger(0);
+
+        Result<ServerSocket> serverSocket = setServer(port.get(), 5, 500);
+        if (!serverSocket.isSuccess()) {
+            return;
+        } else {
+            System.out.println("Server established on port " + port.get());
+            System.out.println("Server expects connections...");
+        }
+
+        while (true) {
+            try {
+                Socket socket = serverSocket.get().accept();
                 Server newServer = new SimpleServer(socket, serverPool, userNames);
                 Logger logger = new Logger(newServer, messagesCount);
                 logger.setLogging(true);

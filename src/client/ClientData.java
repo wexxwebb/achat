@@ -2,9 +2,13 @@ package client;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import common.sleep.Sleep;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static common.SystemMessages.*;
 
@@ -21,19 +25,11 @@ public class ClientData {
     private volatile int state;
     private GsonBuilder gsonBuilder = new GsonBuilder();
     private Gson gson = gsonBuilder.create();
-
+    private Lock lock = new ReentrantLock();
 
     public ClientData(String address, int port) {
         this.address = address;
         this.port = port;
-    }
-
-    public void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
     }
 
     public void connect() throws IOException {
@@ -65,10 +61,14 @@ public class ClientData {
                     return;
                 } else {
                     System.out.printf("Can't close socket. Retry %d\n", retry);
-                    sleep(200);
+                    Sleep.millis(200);
                 }
             }
         }
+    }
+
+    public Lock getLock() {
+        return lock;
     }
 
     public Gson getGson() {

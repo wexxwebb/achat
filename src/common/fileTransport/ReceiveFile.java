@@ -1,6 +1,7 @@
 package common.fileTransport;
 
 import common.decoder.Decoder;
+import common.sleep.Sleep;
 
 import java.io.BufferedInputStream;
 import java.io.FileOutputStream;
@@ -16,15 +17,6 @@ public class ReceiveFile implements Receiver {
         this.destination = destination;
     }
 
-    private boolean sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-            return true;
-        } catch (InterruptedException e1) {
-            return false;
-        }
-    }
-
     @Override
     public boolean receive(String fileName) {
         FileOutputStream fileOutputStream;
@@ -38,7 +30,7 @@ public class ReceiveFile implements Receiver {
                     lengthAsByteArray = Decoder.initArray(lengthAsByteArray);
                     input.read(lengthAsByteArray);
                     length = Decoder.byteArrayAsInt(lengthAsByteArray);
-                    if (length == 0) break;
+                    if (length == -1) break;
                     byte[] buffer = new byte[length];
                     input.read(buffer);
                     fileOutputStream.write(buffer, 0, length);
@@ -51,7 +43,7 @@ public class ReceiveFile implements Receiver {
                 if (retry > 5) {
                     return false;
                 } else {
-                    if (!sleep(250)) return false;
+                    Sleep.millis(250);
                 }
             }
         }
