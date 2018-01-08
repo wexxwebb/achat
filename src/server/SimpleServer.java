@@ -1,5 +1,6 @@
 package server;
 
+import common.decoder.Decoder;
 import common.fileTransport.*;
 import common.Message;
 import com.google.gson.Gson;
@@ -8,17 +9,13 @@ import common.sleep.Sleep;
 
 import java.io.*;
 import java.net.Socket;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 
 import static common.SystemMessages.*;
 
 public class SimpleServer implements Server {
 
-    private Server loggedServer;
     private Socket socket;
     private final BlockingQueue<Server> serverPool;
     private BufferedInputStream inStream;
@@ -55,10 +52,6 @@ public class SimpleServer implements Server {
         }
     }
 
-    public void setLoggedServer(Server loggedServer) {
-        this.loggedServer = loggedServer;
-    }
-
     public void setRoom(String room) {
         this.room = room;
     }
@@ -73,13 +66,14 @@ public class SimpleServer implements Server {
         return auth;
     }
 
+    @SuppressWarnings("Duplicates")
     @Override
     public boolean sendString(String string) {
         int retry = 0;
         while (!exit) {
             try {
-                byte[] temp = string.getBytes();
-                outStream.write(temp.length);
+                byte[] buffer = string.getBytes();
+                outStream.write(Decoder.intAsByteArray(buffer.length));
                 outStream.write(string.getBytes());
                 outStream.flush();
                 return true;
@@ -98,7 +92,7 @@ public class SimpleServer implements Server {
         return true;
     }
 
-    private void exit() {
+    private void exit(boolean silent) {
         int retry = 0;
         while (true) {
             try {
@@ -108,7 +102,7 @@ public class SimpleServer implements Server {
                 inStream.close();
                 outStream.close();
                 socket.close();
-                System.out.printf("%s disconnected from server\n", userName);
+                if (!silent) System.out.printf("%s disconnected from server\n", userName);
                 return;
             } catch (IOException e) {
                 retry++;
@@ -126,10 +120,12 @@ public class SimpleServer implements Server {
         int retry = 0;
         while (!exit) {
             try {
-                int length = inStream.read();
-                byte[] temp = new byte[length];
-                inStream.read(temp);
-                return new String(temp);
+                byte[] intAsBytes = new byte[4];
+                inStream.read(intAsBytes);
+                int length = Decoder.byteArrayAsInt(intAsBytes);
+                byte[] buffer = new byte[length];
+                inStream.read(buffer);
+                return new String(buffer);
             } catch (IOException e) {
                 retry++;
                 if (retry > 5) {
@@ -168,7 +164,7 @@ public class SimpleServer implements Server {
 
     private boolean checkString(String line) {
         if (READING_ERROR.equals(line)) {
-            exit();
+            exit(false);
             return false;
         } else {
             return true;
@@ -232,11 +228,35 @@ public class SimpleServer implements Server {
                     Receiver receiveFile = new ReceiveFile(inStream, "ReceivedFiles/");
                     if (receiveFile.receive(message.getOption())) {
                         System.out.println("File " + message.getOption() + " received successful.");
-                        //broadCastAll(new Message(USER, userName + " shared file " + message.getOption()));
+                        broadCastAll(new Message(USER, message.getLogin() + " shared file " + message.getOption()));
                         exit = true;
-                        exit();
+                        exit(true);
                     } else {
                         System.out.println("File receiving error.");
+                    }
+                    break;
+                case DOWNLOAD:
+                    String json;
+                    if (getFileList().contains(message.getOption())) {
+//                        json = gson.toJson(new Message(SYSTEM, READY_TO_TRANSFER_FILE, message.getOption()));
+//                        sendString(json); //todo server should send approve fie existiig
+                        Transmitter transferFile = new TransferFile(outStream, "ReceivedFiles/");
+                        if (transferFile.transfer(message.getOption())) {
+                            exit = true;
+                            exit(true);
+                            System.out.println("File " + message.getOption() + " transfered sucessful.");
+                        } else {
+                            System.out.println("File transmitting error.");
+                        }
+                    } else {
+                        json = gson.toJson(
+                                new Message(
+                                        USER,
+                                        String.format("File '%s' not exist.", message.getOption()))
+                        );
+                        sendString(json);
+                        exit = exit;
+                        exit(true);
                     }
                     break;
             }
@@ -312,16 +332,6 @@ public class SimpleServer implements Server {
                         sendString(json);
                         break;
 
-//                    case SEND_FILE:
-//                        Receiver receiveFile = new ReceiveFile(inStream, "ReceivedFiles/");
-//                        if (receiveFile.receive(message.getOption())) {
-//                            System.out.println("File " + message.getOption() + " received successful.");
-//                            broadCastAll(new Message(USER, userName + " shared file " + message.getOption()));
-//                        } else {
-//                            System.out.println("File receiving error.");
-//                        }
-//                        break;
-
 //                    case DOWNLOAD:
 //                        if (getFileList().contains(message.getOption())) {
 //                            json = gson.toJson(new Message(SYSTEM, READY_TO_TRANSFER_FILE, message.getOption()));
@@ -344,7 +354,7 @@ public class SimpleServer implements Server {
                         json = gson.toJson(new Message(SYSTEM, EXIT));
                         sendString(json);
                         exit = true;
-                        exit();
+                        exit(false);
 
                     default:
                         json = gson.toJson(unknownCommand());
@@ -353,15 +363,10 @@ public class SimpleServer implements Server {
                 }
                 break;
             case USER:
-                loggedServer.print(userName + ": " + message.getMessage());
+                System.out.println(userName + ": " + message.getMessage());
                 broadCastRoom(message);
                 break;
         }
-    }
-
-    @Override
-    public void print(String string) {
-        System.out.println(string);
     }
 
     @Override

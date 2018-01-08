@@ -1,5 +1,8 @@
 package common;
 
+import static common.SystemMessages.SEND_FILE;
+import static common.SystemMessages.SYSTEM;
+
 public class Message {
 
     private String type;
@@ -7,6 +10,10 @@ public class Message {
     private String option;
     private String login;
     private String passwordHash;
+
+    public Message() {
+
+    }
 
     public Message(String type, String message) {
         this.type = type;
@@ -24,6 +31,15 @@ public class Message {
         this.message = message;
         this.login = login;
         this.passwordHash = passwordHash;
+    }
+
+    public static Message getMessageForFile(String fileName, String userName) {
+        Message message = new Message();
+        message.type = SYSTEM;
+        message.message = SEND_FILE;
+        message.option = fileName;
+        message.login = userName;
+        return message;
     }
 
     public String getOption() {

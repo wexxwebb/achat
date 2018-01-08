@@ -1,11 +1,13 @@
 package client;
 
 import common.Message;
+import common.decoder.Decoder;
 import common.fileTransport.ReceiveFile;
 import common.fileTransport.Receiver;
 import common.sleep.Sleep;
 
 import java.io.*;
+import java.net.Socket;
 
 import static common.SystemMessages.*;
 
@@ -33,10 +35,12 @@ public class ReaderClient implements Client {
         int retry = 0;
         while (true) {
             try {
-                int length = clientData.getInStream().read();
-                byte[] result = new byte[length];
-                clientData.getInStream().read(result);
-                return new String(result);
+                byte[] intAsBytes = new byte[4];
+                clientData.getInStream().read(intAsBytes);
+                int length = Decoder.byteArrayAsInt(intAsBytes);
+                byte[] buffer = new byte[length];
+                clientData.getInStream().read(buffer);
+                return new String(buffer);
             } catch (IOException e) {
                 retry++;
                 if (retry > 5) {
@@ -107,14 +111,23 @@ public class ReaderClient implements Client {
                 clientData.setState(STATE_NOT_AUTHORIZED);
                 break;
 
-            case READY_TO_TRANSFER_FILE:
-                Receiver fileReceiver = new ReceiveFile(clientData.getInStream(), "Downloads/");
-                if (fileReceiver.receive(message.getOption())) {
-                    System.out.println("File " + message.getOption() + " received successful.");
-                } else {
-                    System.out.println("File receiving error.");
-                }
-                break;
+//            case READY_TO_TRANSFER_FILE:
+//                try {
+//                    Socket socket = new Socket(clientData.getAddress(), clientData.getPort());
+//                    BufferedInputStream input = new BufferedInputStream(socket.getInputStream());
+//                    Receiver receiver = new ReceiveFile(input, "Downloads/");
+//                    if (receiver.receive(message.getOption())) {
+//                        input.close();
+//                        socket.close();
+//                        System.out.printf("File '%s' received successful", message.getOption());
+//                    } else {
+//                        System.out.println("File receiving error.");
+//                    }
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+//                break;
+
             case EXIT:
                 clientData.exit();
                 break;

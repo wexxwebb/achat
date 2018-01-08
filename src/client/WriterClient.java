@@ -1,6 +1,9 @@
 package client;
 
 import common.Message;
+import common.decoder.Decoder;
+import common.fileTransport.ReceiveFile;
+import common.fileTransport.Receiver;
 import common.fileTransport.TransferFile;
 import common.fileTransport.Transmitter;
 import common.sleep.Sleep;
@@ -21,13 +24,14 @@ public class WriterClient implements Client {
         console = new Scanner(System.in);
     }
 
+    @SuppressWarnings("Duplicates")
     private boolean send(String string, BufferedOutputStream output) {
         int retry = 0;
         while (true) {
             try {
-                byte[] temp = string.getBytes();
-                output.write(temp.length);
-                output.write(temp);
+                byte[] buffer = string.getBytes();
+                output.write(Decoder.intAsByteArray(buffer.length));
+                output.write(string.getBytes());
                 output.flush();
                 return true;
             } catch (IOException e) {
@@ -67,7 +71,7 @@ public class WriterClient implements Client {
                         try {
                             Socket socket = new Socket(clientData.getAddress(), clientData.getPort());
                             BufferedOutputStream output = new BufferedOutputStream(socket.getOutputStream());
-                            json = clientData.getGson().toJson(new Message(SYSTEM, SEND_FILE, file.getName()));
+                            json = clientData.getGson().toJson(Message.getMessageForFile(file.getName(), clientData.getName()));
                             send(json, output);
                             Transmitter transferFile = new TransferFile(output);
                             if (transferFile.transfer(file.getAbsolutePath())) {
@@ -91,12 +95,33 @@ public class WriterClient implements Client {
 
             case DOWNLOAD:
                 if (s.length == 2) {
-                    json = clientData.getGson().toJson(new Message(SYSTEM, DOWNLOAD, s[1]));
-                    send(json, clientData.getOutStream());
+                    try {
+                        Socket socket = new Socket(clientData.getAddress(), clientData.getPort());
+                        BufferedInputStream input = new BufferedInputStream(socket.getInputStream());
+                        BufferedOutputStream output = new BufferedOutputStream(socket.getOutputStream());
+                        json = clientData.getGson().toJson(
+                                new Message(SYSTEM, DOWNLOAD, s[1])
+                        );
+                        send(json, output);
+                        //todo client shold accept aproove file existing from server
+                        Receiver receiver = new ReceiveFile(input, "Downloads/");
+                        if (receiver.receive(s[1])) {
+                            input.close();
+                            output.close();
+                            socket.close();
+                            System.out.printf("File '%s' received successful.\n", s[1]);
+                        } else {
+                            System.out.println("File receiving error.");
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace(); //todo need handle exception
+                    }
+                    break;
                 } else {
                     System.out.println("Unknown command");
                 }
                 break;
+
             case FILE_LIST:
                 json = clientData.getGson().toJson(new Message(SYSTEM, FILE_LIST));
                 send(json, clientData.getOutStream());
@@ -121,7 +146,13 @@ public class WriterClient implements Client {
                 System.out.println("Input password");
                 String password = console.nextLine().trim();
                 password = Integer.toString(Integer.toString(password.hashCode() + SALT.hashCode()).hashCode());
-                json = clientData.getGson().toJson(new Message(SYSTEM, LOGIN_AND_HASH_CODE_PASSWORD, login, password));
+                json = clientData.getGson().toJson(
+                        new Message(
+                                SYSTEM,
+                                LOGIN_AND_HASH_CODE_PASSWORD,
+                                login,
+                                password)
+                );
                 if (!send(json, clientData.getOutStream())) {
                     return;
                 }
